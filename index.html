@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Pain Tracker</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #37352f;
+            --card-bg: #f7f6f3;
+            --inactive: #e0e0e0;
+            --stroke: #ffffff;
+            --primary: #eb5757;
+        }
+
+        /* Notion Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #191919;
+                --text-color: #d1d1d1;
+                --card-bg: #252525;
+                --inactive: #3f3f3f;
+                --stroke: #191919;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .widget-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        h4 { margin: 0 0 15px 0; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* SVG Styling */
+        svg { width: 100%; height: auto; max-height: 350px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+        
+        .body-part {
+            fill: var(--inactive);
+            stroke: var(--stroke);
+            stroke-width: 1.5;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .body-part:hover { fill: #bdbdbd; }
+        .selected { stroke: var(--text-color); stroke-width: 2.5; }
+
+        /* Controls */
+        .controls { margin-top: 20px; border-top: 1px solid var(--inactive); padding-top: 15px; }
+        
+        .severity-label { font-size: 12px; margin-bottom: 8px; display: block; font-weight: bold; }
+        
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--primary);
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        #status-msg { font-size: 11px; margin-top: 8px; color: var(--primary); height: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="widget-card">
+    <h4 id="display-name">Select Area</h4>
+    
+    <svg viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg">
+        <path class="body-part" data-name="Head/Neck" d="M100,20 c-10,0 -18,8 -18,18 c0,10 8,18 18,18 s18,-8 18,-18 c0,-10 -8,-18 -18,-18 z" />
+        <path class="body-part" data-name="Chest/Shoulders" d="M70,60 h60 v40 c0,10 -10,20 -30,20 s-30,-10 -30,-20 z" />
+        <path class="body-part" data-name="Abdomen/Core" d="M70,105 h60 v40 c0,10 -10,15 -30,15 s-30,-5 -30,-15 z" />
+        <path class="body-part" data-name="Right Arm" d="M135,65 q15,0 15,15 v100 h-12 v-100 z" />
+        <path class="body-part" data-name="Left Arm" d="M65,65 q-15,0 -15,15 v100 h12 v-100 z" />
+        <path class="body-part" data-name="Hips/Pelvis" d="M70,165 h60 v20 c0,10 -10,15 -30,15 s-30,-5 -30,-15 z" />
+        <path class="body-part" data-name="Right Leg" d="M105,200 v150 h20 v-150 z" />
+        <path class="body-part" data-name="Left Leg" d="M75,200 v150 h20 v-150 z" />
+    </svg>
+
+    <div class="controls">
+        <span class="severity-label">Severity: <span id="sev-num">5</span>/10</span>
+        <input type="range" id="severity" min="1" max="10" value="5">
+        <button onclick="copyToClipboard()">Copy Log Entry</button>
+        <div id="status-msg"></div>
+    </div>
+</div>
+
+<script>
+    let selectedPart = "";
+    const nameDisplay = document.getElementById('display-name');
+    const slider = document.getElementById('severity');
+    const sevNum = document.getElementById('sev-num');
+    const status = document.getElementById('status-msg');
+
+    // Handle Body Part Selection
+    document.querySelectorAll('.body-part').forEach(part => {
+        part.addEventListener('click', () => {
+            document.querySelectorAll('.body-part').forEach(p => {
+                p.classList.remove('selected');
+                p.style.fill = ""; // Reset colors
+            });
+            
+            part.classList.add('selected');
+            selectedPart = part.getAttribute('data-name');
+            nameDisplay.innerText = selectedPart;
+            updateHeatmap();
+        });
+    });
+
+    // Handle Slider Input
+    slider.oninput = function() {
+        sevNum.innerText = this.value;
+        updateHeatmap();
+    };
+
+    function updateHeatmap() {
+        const activePart = document.querySelector('.selected');
+        if (!activePart) return;
+
+        const val = parseInt(slider.value);
+        let color = "#FFEB3B"; // Low (Yellow)
+        if (val > 3) color = "#F2994A"; // Medium (Orange)
+        if (val > 7) color = "#EB5757"; // High (Red)
+        
+        activePart.style.fill = color;
+    }
+
+    function copyToClipboard() {
+        if (!selectedPart) {
+            status.innerText = "⚠️ Select a body part first";
+            return;
+        }
+        const text = `Location: ${selectedPart} | Severity: ${slider.value}/10`;
+        navigator.clipboard.writeText(text).then(() => {
+            status.innerText = "✅ Copied to clipboard!";
+            setTimeout(() => status.innerText = "", 2000);
+        });
+    }
+</script>
+
+</body>
+</html>
